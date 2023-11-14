@@ -1,0 +1,105 @@
+#+title: Day2
+* --- Day 2: Password Philosophy ---
+
+Your flight departs in a few days from the coastal airport; the easiest way down to the coast from here is via toboggan.
+
+The shopkeeper at the North Pole Toboggan Rental Shop is having a bad day. "Something's wrong with our computers; we can't log in!" You ask if you can take a look.
+
+Their password database seems to be a little corrupted: some of the passwords wouldn't have been allowed by the Official Toboggan Corporate Policy that was in effect when they were chosen.
+
+To try to debug the problem, they have created a list (your puzzle input) of passwords (according to the corrupted database) and the corporate policy when that password was set.
+
+For example, suppose you have the following list:
+
+#+begin_example
+1-3 a: abcde
+1-3 b: cdefg
+2-9 c: ccccccccc
+#+end_example
+
+Each line gives the password policy and then the password. The password policy indicates the lowest and highest number of times a given letter must appear for the password to be valid. For example, 1-3 a means that the password must contain a at least 1 time and at most 3 times.
+
+In the above example, 2 passwords are valid. The middle password, cdefg, is not; it contains no instances of b, but needs at least 1. The first and third passwords are valid: they contain one a or nine c, both within the limits of their respective policies.
+
+How many passwords are valid according to their policies?
+
+
+** Solution Part one
+
+Read in input
+#+begin_src lisp :results output replace :tangle day2.lisp
+(setq *input* (uiop:read-file-lines "input.txt"))
+#+end_src
+
+#+RESULTS:
+
+Now that we have the input we need to grap the details of the password policy
+
+*** Install deps
+Install smug, a parser combinator
+
+#+begin_src lisp :tangle day2.lisp
+;(ql:quickload :smug)
+(ql:quickload :re)
+#+end_src
+
+#+RESULTS:
+| :RE |
+
+
+*** The Password parser
+
+First we need to tokenize the input
+
+#+begin_src lisp :results table replace :results none :async t :tangle day2.lisp
+(ql:quickload :re)
+
+(setq *policy* (re:compile-re "(%d+)%-(%d+) (%a): (%a+)"))
+
+(defun split-line (line)
+  (let* ((policy (re:match-groups (re:match-re *policy* line)))
+         (min (parse-integer (first policy)))
+         (max (parse-integer (second policy))))
+    (list :max max :min min :letter (char (third policy) 0) :password (fourth policy))))
+
+
+(setq *password-lines* (loop for line in *input* collect (split-line line)))
+
+
+#+end_src
+
+*** Part One solution
+#+begin_src lisp
+(defun part1 (input)
+  (count t  (loop for password in input
+                  collect (let ((n (count (getf password :letter) (getf password :password))))
+                            (and (>= n (getf password :min)) (<= n (getf password :max)))))))
+
+
+#+end_src
+
+* Part two
+While it appears you validated the passwords correctly, they don't seem to be what the Official Toboggan Corporate Authentication System is expecting.
+
+The shopkeeper suddenly realizes that he just accidentally explained the password policy rules from his old job at the sled rental place down the street! The Official Toboggan Corporate Policy actually works a little differently.
+
+Each policy actually describes two positions in the password, where 1 means the first character, 2 means the second character, and so on. (Be careful; Toboggan Corporate Policies have no concept of "index zero"!) Exactly one of these positions must contain the given letter. Other occurrences of the letter are irrelevant for the purposes of policy enforcement.
+
+Given the same example list from above:
+
+1-3 a: abcde is valid: position 1 contains a and position 3 does not.
+1-3 b: cdefg is invalid: neither position 1 nor position 3 contains b.
+2-9 c: ccccccccc is invalid: both position 2 and position 9 contain c.
+How many passwords are valid according to the new interpretation of the policies?
+
+#+begin_src lisp
+(defun part2 (input)
+  (count t  (loop for password in input
+                  for letter = (getf password :letter)
+                  for pos1 = (- (getf password :min) 1)
+                  for pos2 = (- (getf password :max) 1)
+                  for pass = (getf password :password)
+                  for str = (list (char pass pos1) (char pass pos2))
+                  do (format t "~a ~a: ~a~%" (char pass pos1) (char pass pos2) (not (and (char= letter (char pass pos1)) (char= letter (char pass pos2)))))
+                  collect (= 1 (count letter str)))))
+#+end_src
